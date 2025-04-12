@@ -2,16 +2,29 @@ package main
 
 import "time"
 
-type Variable string
+type PhysicalVariable string
+type TuneVariable string
 
 const (
-	Temperature Variable = "temperature"
-	Humidity    Variable = "humidity"
-	Moisture    Variable = "moisture"
+	Temperature PhysicalVariable = "temperature"
+	Humidity    PhysicalVariable = "humidity"
+	Moisture    PhysicalVariable = "moisture"
 )
 
+const (
+	KP TuneVariable = "kp"
+	KI TuneVariable = "ki"
+	KD TuneVariable = "kd"
+)
+
+type TuneProfile struct {
+	KP float64 `json:"kp"`
+	KI float64 `json:"ki"`
+	KD float64 `json:"kd"`
+}
+
 type DbEntry struct {
-	Variable  Variable
+	Variable  PhysicalVariable
 	Timestamp time.Time
 	SP        float64
 	PV        float64

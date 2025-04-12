@@ -15,6 +15,7 @@ const (
 func StartESPPolling(
 	interval time.Duration,
 	spState *SPState,
+	tuneState *TuneState,
 	db *sql.DB,
 ) {
 	log.Printf("INFO.START.StartEspPollingConfiguration\n")
@@ -23,9 +24,11 @@ func StartESPPolling(
 	go func() {
 		for range ticker.C {
 			spMap := spState.GetAll()
+			tuneMap := tuneState.GetAll()
+
 			log.Printf(LogInfoStartBatchPolling, spMap)
 
-			dbEntries, err := FetchFromESPAndMapDbEntry(spMap)
+			dbEntries, err := FetchFromESPAndMapDbEntry(spMap, tuneMap)
 			if err != nil {
 				log.Printf(LogErrorBatchPolling, spMap, "fetchFromESPAndMapDbEntry failed", err)
 				continue

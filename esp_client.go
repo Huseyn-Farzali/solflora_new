@@ -21,20 +21,26 @@ type ResponseData struct {
 	CO float64 `json:"CO"`
 }
 
-type ESPRequestBody map[Variable]struct {
-	SP float64 `json:"SP"`
+type ESPRequestBody map[PhysicalVariable]struct {
+	SP float64 `json:"sp"`
+	KP float64 `json:"kp"`
+	KI float64 `json:"ki"`
+	KD float64 `json:"kd"`
 }
 
-type ESPResponseBody map[Variable]ResponseData
+type ESPResponseBody map[PhysicalVariable]ResponseData
 
-func FetchFromESPAndMapDbEntry(spMap map[Variable]float64) ([]DbEntry, error) {
+func FetchFromESPAndMapDbEntry(spMap map[PhysicalVariable]float64, tuneMap map[PhysicalVariable]TuneProfile) ([]DbEntry, error) {
 	log.Printf(LogInfoStartBatch, spMap)
 
 	reqBody := make(ESPRequestBody)
-	for variable, sp := range spMap {
+	for variable, _ := range spMap {
 		reqBody[variable] = struct {
-			SP float64 `json:"SP"`
-		}{SP: sp}
+			SP float64 `json:"sp"`
+			KP float64 `json:"kp"`
+			KI float64 `json:"ki"`
+			KD float64 `json:"kd"`
+		}{SP: spMap[variable], KP: tuneMap[variable].KP, KI: tuneMap[variable].KI, KD: tuneMap[variable].KD}
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)

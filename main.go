@@ -10,11 +10,13 @@ func main() {
 	defer dbConn.Close()
 
 	spState := NewSPState()
+	tuneState := NewTuneState()
 
-	StartESPPolling(EspPollingInterval, spState, dbConn)
+	StartESPPolling(EspPollingInterval, spState, tuneState, dbConn)
 
-	// 6. HTTP routes
-	http.HandleFunc("/api/sp", HandleChartData(dbConn))
+	http.HandleFunc("/api/data", HandleChartData(dbConn))
+	http.HandleFunc("/api/setpoints", HandleSetPointUpdate(spState))
+	http.HandleFunc("/api/update-pid", HandleTuningUpdate(tuneState))
 
 	log.Println("🌱 Solflora backend running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

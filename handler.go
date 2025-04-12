@@ -30,13 +30,13 @@ func HandleChartData(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		variables := []Variable{
+		variables := []PhysicalVariable{
 			Temperature,
 			Humidity,
 			Moisture,
 		}
 
-		responseData := make(map[Variable][]SimplifiedEntry)
+		responseData := make(map[PhysicalVariable][]SimplifiedEntry)
 
 		query := `
 			SELECT sp, pv, co
@@ -76,5 +76,56 @@ func HandleChartData(db *sql.DB) http.HandlerFunc {
 		}
 
 		log.Printf("INFO.END.HandleChartData\n")
+	}
+}
+
+func HandleSetPointUpdate(spState *SPState) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "only POST method is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var updates map[PhysicalVariable]float64
+		if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+			http.Error(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+
+		for variable, sp := range updates {
+			switch variable {
+			case Temperature, Moisture:
+				spState.Set(variable, sp)
+			default: // Ignore humidity
+			}
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+
+}
+
+func HandleTuningUpdate(tuneState *TuneState) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "only POST method is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var updates map[PhysicalVariable]TuneProfile
+		if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+			http.Error(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+
+		for variable, profile := range updates {
+			switch variable {
+			case Temperature, Moisture:
+				tuneState.Set(variable, profile)
+			default: // Ignore humidity
+			}
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
