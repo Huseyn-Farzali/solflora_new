@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -26,7 +27,7 @@ type ESPRequestBody map[Variable]struct {
 
 type ESPResponseBody map[Variable]ResponseData
 
-func FetchFromESP(spMap map[Variable]float64) (map[Variable]DbEntry, error) {
+func FetchFromESPAndMapDbEntry(spMap map[Variable]float64) ([]DbEntry, error) {
 	log.Printf(LogInfoStartBatch, spMap)
 
 	reqBody := make(ESPRequestBody)
@@ -38,31 +39,47 @@ func FetchFromESP(spMap map[Variable]float64) (map[Variable]DbEntry, error) {
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf(LogErrorBatch, spMap, "json marshalling failed", err)
+		log.Printf(LogErrorBatch, spMap, "json marshalling failed", err)
+		return nil, fmt.Errorf("json marshalling failed: %w", err)
 	}
 
-	resp, err := http.Post(EspBaseUrl, "application/json", bytes.NewBuffer(bodyBytes))
+	ctx, cancel := context.WithTimeout(context.Background(), EspPollingCallTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, EspBaseUrl, bytes.NewBuffer(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf(LogErrorBatch, spMap, "[POST] request to ESP failed", err)
+		log.Printf(LogErrorBatch, spMap, "creating HTTP request failed", err)
+		return nil, fmt.Errorf("creating HTTP request failed: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf(LogErrorBatch, spMap, "[POST] request to ESP failed", err)
+		return nil, fmt.Errorf("[POST] request to ESP failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var response ESPResponseBody
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf(LogErrorBatch, spMap, "failed to decode ESP response", err)
+		log.Printf(LogErrorBatch, spMap, "failed to decode ESP response", err)
+		return nil, fmt.Errorf("failed to decode ESP response: %w", err)
 	}
 
-	result := make(map[Variable]DbEntry)
+	result := make([]DbEntry, 3)
 	now := time.Now()
 
+	index := 0
 	for variable, data := range response {
-		result[variable] = DbEntry{
+		result[index] = DbEntry{
 			Variable:  variable,
-			TimeStamp: now,
+			Timestamp: now,
 			SP:        spMap[variable],
 			PV:        data.PV,
 			CO:        data.CO,
 		}
+		index++
 	}
 
 	log.Printf(LogInfoEndBatch, spMap)

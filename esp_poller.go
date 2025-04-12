@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"time"
 )
@@ -14,41 +15,31 @@ const (
 func StartESPPolling(
 	interval time.Duration,
 	spState *SPState,
-	insertQueue chan<- DbEntry,
-	notifyQueue chan<- DbEntry,
+	db *sql.DB,
 ) {
-	log.Printf("INFO.ESP_POLLING.START\n")
+	log.Printf("INFO.START.StartEspPollingConfiguration\n")
 	ticker := time.NewTicker(interval)
 
 	go func() {
 		for range ticker.C {
 			spMap := spState.GetAll()
-
 			log.Printf(LogInfoStartBatchPolling, spMap)
 
-			signalMap, err := FetchFromESP(spMap)
+			dbEntries, err := FetchFromESPAndMapDbEntry(spMap)
 			if err != nil {
-				log.Printf(LogErrorBatchPolling, spMap, "fetchFromESP failed", err)
+				log.Printf(LogErrorBatchPolling, spMap, "fetchFromESPAndMapDbEntry failed", err)
 				continue
 			}
 
-			for _, signal := range signalMap {
-				select {
-				case insertQueue <- signal:
-				default:
-					log.Println("⚠️ insertQueue full — dropping signal:", signal)
-				}
-
-				select {
-				case notifyQueue <- signal:
-				default:
-					log.Println("⚠️ notifyQueue full — dropping signal:", signal)
-				}
+			err = insertBatchToDb(db, dbEntries)
+			if err != nil {
+				log.Printf(LogErrorBatchPolling, spMap, "insertBatchToDb failed", err)
+				continue
 			}
 
 			log.Printf(LogInfoEndBatchPolling, spMap)
 		}
 	}()
 
-	log.Printf("INFO.ESP_POLLING.END\n")
+	log.Printf("INFO.END.StartEspPollingConfiguration\n")
 }
